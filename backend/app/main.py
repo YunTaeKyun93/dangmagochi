@@ -28,7 +28,7 @@ sentry_sdk.init(
 )
 
 
-asynccontextmanager
+@asynccontextmanager
 async def lifespan(app: FastAPI):
     os.makedirs("/ml/risk_model/saved_models", exist_ok=True)
     try:
