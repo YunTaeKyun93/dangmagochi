@@ -30,7 +30,7 @@ sentry_sdk.init(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    os.makedirs("/ml/risk_model/saved_models", exist_ok=True)
+    os.makedirs("/tmp/risk_model/saved_models", exist_ok=True)
     try:
         s3 = boto3.client('s3', region_name='ap-northeast-2')
         bucket = settings.S3_BUCKET_NAME

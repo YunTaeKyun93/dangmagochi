@@ -9,7 +9,7 @@ from app.core.config import settings
 try:
       sys.path.append("/ml/risk_model")
       import config #type:ignore
-      config.SAVE_DIR = "/ml/risk_model/saved_models"
+      config.SAVE_DIR = "/tmp/risk_model/saved_models"
 except ModuleNotFoundError:
       config = None
 
