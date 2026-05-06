@@ -30,16 +30,19 @@ sentry_sdk.init(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    os.makedirs("/tmp/risk_model/saved_models", exist_ok=True)
     try:
+        save_dir = "/tmp/risk_model/saved_models"
+        os.makedirs(save_dir, exist_ok=True)
         s3 = boto3.client('s3', region_name='ap-northeast-2')
         bucket = settings.S3_BUCKET_NAME
         for filename in ["diabetes_model_v3.pkl", "feature_names_v3.pkl", "threshold_v3.pkl"]:
-            s3.download_file(bucket, f"models/{filename}", f"/ml/risk_model/saved_models/{filename}")
+            s3.download_file(bucket, f"models/{filename}", f"{save_dir}/{filename}")
         print("모델 로드 완료")
     except Exception as e:
         print(f"모델 로드 실패: {e}")
     yield
+
+
 
 
 app = FastAPI(
