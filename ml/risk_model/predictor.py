@@ -8,7 +8,7 @@ from feature_engineering import compute_risk_count
 import os
 
 
-def load_model(save_dir="/ml/risk_model/saved_models"):
+def load_model(save_dir="/tmp/risk_model/saved_models"):
     """저장된 모델, 피처, threshold 로드"""
     model = joblib.load(os.path.join(save_dir, "diabetes_model_v3.pkl"))
     feats = joblib.load(os.path.join(save_dir, "feature_names_v3.pkl"))
