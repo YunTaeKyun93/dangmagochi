@@ -7,7 +7,7 @@ from app.core.config import settings
 
 
 try:
-      sys.path.append("/ml/risk_model")
+      sys.path.append("/app/ml/risk_model")
       import config #type:ignore
       config.SAVE_DIR = "/tmp/risk_model/saved_models"
 except ModuleNotFoundError:

@@ -5,11 +5,13 @@ on:
     branches: [develop, main]
     paths:
       - "backend/**"
+      - "ml/**"
       - ".github/**"
   pull_request:
     branches: [develop, main]
     paths:
       - "backend/**"
+      - "ml/**"
       - ".github/**"
 
 jobs:
@@ -50,7 +52,8 @@ jobs:
           REFRESH_TOKEN_EXPIRE_DAYS: 7
 
       - name: Docker build check
-        run: docker build -t dangmagochi-backend:${{ github.sha }} .
+        working-directory: ${{ github.workspace }}
+        run: docker build -f backend/Dockerfile -t dangmagochi-backend:${{ github.sha }} .
 
   deploy:
     name: Deploy to ECS
@@ -66,8 +69,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
 
       - name: Login to ECR
@@ -75,15 +78,17 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Build and push
+        working-directory: ${{ github.workspace }}
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: dangmago-backend
-          IMAGE_TAG: ${{github.sha}}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           docker buildx build --platform linux/amd64 \
-          -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-          -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-          --push .
+            -f backend/Dockerfile \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            --push .
 
       - name: Run DB Migration
         run: |
@@ -98,7 +103,6 @@ jobs:
 
           echo "Migration task ARN: $TASK_ARN"
 
-          # 마이그레이션 완료까지 대기
           aws ecs wait tasks-stopped \
             --cluster dangmago-backend \
             --tasks $TASK_ARN \

@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --user --no-cache-dir -r requirements.txt
 
@@ -26,7 +26,8 @@ RUN useradd -m -u 1000 appuser
 
 COPY --from=builder /root/.local /home/appuser/.local
 
-COPY --chown=appuser:appuser . .
+COPY --chown=appuser:appuser backend/ .
+COPY --chown=appuser:appuser ml/risk_model /app/ml/risk_model
 
 USER appuser
 
