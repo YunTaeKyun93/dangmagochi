@@ -32,6 +32,7 @@ python-dotenv==1.2.2
 
 
 lightgbm==4.3.0
+catboost==1.2.10
 
 
 slowapi

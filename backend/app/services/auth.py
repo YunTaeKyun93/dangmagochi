@@ -9,7 +9,7 @@ from app.core.config import settings
 from app.models.user import User, UserType, GoalType, RiskLevel, DiabetesType
 from app.schemas.auth import RegisterRequest, KakaoRegisterRequest, NaverRegisterRequest
 from app.services.challenge import create_default_challenges
-
+from app.services.predict import predict_diabetes_risk
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
 
@@ -104,8 +104,24 @@ def register_user(db: Session, data: RegisterRequest) -> User:
     db.add(user)
     db.commit()
     db.refresh(user)
-
+    if data.user_type != "diabetes":
+        try:
+            result = predict_diabetes_risk(user)
+            risk_score = result["risk_score"]
+            risk_level = result["risk_level"]
+            if risk_score < 0.35:
+                user.user_type = UserType.normal
+                user.risk_level = RiskLevel.low
+            else:
+                user.user_type = UserType.risk
+                user.risk_level = RiskLevel(risk_level)
+            db.commit()
+            db.refresh(user)
+        except Exception:
+                pass  
+    
     create_default_challenges(db, user)
+
 
     return user
 
