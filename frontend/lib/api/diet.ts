@@ -36,6 +36,21 @@ export async function analyzeDiet(
 }
 
 /**
+ * 음식명 텍스트로 영양소를 분석하고 식단 기록을 생성합니다.
+ * POST /diet/analyze-text
+ * - 사진 없이 음식명만 입력할 때 사용
+ * - GPT-4o-mini로 영양소를 추정하고 DB에 저장합니다
+ */
+export async function analyzeDietByText(
+  foodName: string,
+): Promise<DietAnalyzeResponse & { diet_id: number }> {
+  const json = await client.post<DietAnalyzeApiResponse>("/diet/analyze-text", {
+    food_name: foodName,
+  });
+  return json.data;
+}
+
+/**
  * 직접 입력 모달에서 음식 정보를 수정합니다.
  * (confidence < 0.7이고 사용자가 [직접입력] 선택 시)
  */

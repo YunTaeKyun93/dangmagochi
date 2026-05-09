@@ -428,6 +428,7 @@ export function HomeScreen() {
     setCharacter,
     updateMissionProgress,
     completeMission,
+    checkDailyMissionReset,
   } = useAppStore();
 
   const [showPenaltyModal, setShowPenaltyModal] = useState(false);
@@ -468,6 +469,11 @@ export function HomeScreen() {
     if (!el) return;
     el.scrollTo({ left: index * el.offsetWidth, behavior: "smooth" });
   };
+
+  /* ── 일일 미션 초기화 ── */
+  useEffect(() => {
+    checkDailyMissionReset();
+  }, []);
 
   /* ── ML API 호출 (백엔드 준비 후 아래 주석 해제) ── */
   useEffect(() => {
@@ -510,19 +516,31 @@ export function HomeScreen() {
           : "sick";
 
         const EXP_TABLE: Record<number, number> = { 1: 800, 2: 1200, 3: 1600, 4: 2400 };
-        const level = Math.min(Math.max(Number(data.level ?? 1), 1), 5) as CharacterLevel;
+        const dbLevel = Math.min(Math.max(Number(data.level ?? 1), 1), 5) as CharacterLevel;
+
+        // ── 레벨/경험치 결정 로직 ──────────────────────────────────────────
+        // addExperience()는 Zustand만 업데이트하고 백엔드에는 반영하지 않으므로,
+        // 로컬(Zustand)이 DB보다 앞서 있을 수 있다.
+        // → DB 레벨이 로컬보다 높을 때만 DB 값으로 덮어씀 (DB 직접 수정 반영)
+        // → 로컬이 더 높으면 로컬 레벨/경험치를 유지 (게임 내 레벨업 보호)
+        const currentStore = useAppStore.getState();
+        const localLevel = currentStore.character?.level ?? 1;
+        const localExp   = currentStore.character?.experience ?? 0;
+
+        const finalLevel = (dbLevel >= localLevel ? dbLevel : localLevel) as CharacterLevel;
+        const finalExp   = dbLevel >= localLevel ? (data.exp ?? 0) : localExp;
 
         // Zustand 스토어 캐릭터 업데이트 → UI에 즉시 반영
         setCharacter({
           id: String(data.char_id),
-          name: data.name ?? character?.name ?? "글루",
-          level,
+          name: data.name ?? currentStore.character?.name ?? "글루",
+          level: finalLevel,
           mood,
-          experience: data.exp ?? 0,
-          experienceToNextLevel: EXP_TABLE[level] ?? 2400,
+          experience: finalExp,
+          experienceToNextLevel: EXP_TABLE[finalLevel] ?? 2400,
           createdAt: data.created_at
             ? new Date(data.created_at)
-            : (character?.createdAt ?? new Date()),
+            : (currentStore.character?.createdAt ?? new Date()),
         });
       })
       .catch(() => {

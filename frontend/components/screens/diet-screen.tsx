@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useAppStore } from "@/lib/store";
-import { analyzeDiet } from "@/lib/api/diet";
+import { analyzeDiet, analyzeDietByText } from "@/lib/api/diet";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -171,38 +171,47 @@ export function DietScreen() {
     }
   };
 
-  const handleManualSubmit = () => {
+  const handleManualSubmit = async () => {
     if (!manualFoodName.trim()) return;
+    const foodName = manualFoodName.trim();
     setShowManualModal(false);
     setPreviewUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return null;
     });
     setAnalysisState("analyzing");
-    setTimeout(() => {
-      const mockResult: DietEntry = {
-        id: crypto.randomUUID(),
+    setManualFoodName("");
+    try {
+      const data = await analyzeDietByText(foodName);
+      const entry: DietEntry = {
+        id: String(data.diet_id ?? crypto.randomUUID()),
         mealType: selectedMeal,
-        calories: 350,
-        carbs: 45,
-        protein: 20,
-        fat: 10,
-        feedback: `'${manualFoodName}'을(를) 드셨군요! 건강하게 잘 챙겨 드셨습니다.`,
+        calories: data.calories,
+        carbs: data.carbs,
+        protein: data.protein,
+        fat: 0,
+        feedback: data.health_notes?.[0] ?? "",
         timestamp: new Date(),
       };
-      setAnalysisResult(mockResult);
+      setAnalysisResult(entry);
       setApiExtra({
-        food_name: manualFoodName,
-        diet_score: 75,
-        highlight: "calories",
-        health_notes: [],
-        healthier_alternative: null,
-        confidence: 1.0,
-        alternatives: [],
+        food_name: data.food_name,
+        diet_score: data.diet_score,
+        highlight: data.highlight as "calories" | "protein" | "carbs",
+        health_notes: data.health_notes ?? [],
+        healthier_alternative: data.healthier_alternative ?? null,
+        confidence: data.classification?.confidence ?? 1,
+        alternatives: data.classification?.alternatives ?? [],
       });
       setAnalysisState("complete");
-      setManualFoodName("");
-    }, 1500);
+    } catch (err: any) {
+      setAnalysisState("idle");
+      toast({
+        title: "분석 실패",
+        description: err?.message ?? "음식 분석에 실패했습니다.",
+        variant: "destructive",
+      });
+    }
   };
 
   const checkDietMissions = (analysisData: {
