@@ -21,6 +21,7 @@ import {
   Frown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { CharacterMood, CharacterLevel } from "@/lib/types";
 import { OfflinePenaltyModal } from "./offline-penalty-modal";
 import { Character } from "@/components/character";
 import { Button } from "@/components/ui/button";
@@ -424,6 +425,7 @@ export function HomeScreen() {
     character,
     missions,
     setScreen,
+    setCharacter,
     updateMissionProgress,
     completeMission,
   } = useAppStore();
@@ -490,9 +492,38 @@ export function HomeScreen() {
         setDisplayRecs(AI_RECOMMENDATIONS);
       });
     fetchCharacter()
-      .then((data) => {
-        setOverallState(data.character_state.overall_state);
-        setRiskChangeSummary(data.risk_change_summary);
+      .then((rawData) => {
+        // 실제 백엔드 응답: { success: true, data: { char_id, name, level, exp, status, ... } }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = (rawData as any)?.data;
+        if (!data) return;
+
+        // overall_state (status) 업데이트
+        setOverallState(data.status ?? null);
+
+        // mood: 백엔드는 0~100 숫자, Zustand는 "happy"|"normal"|"sad"|"sick" 문자열
+        const moodNum: number = typeof data.mood === "number" ? data.mood : 50;
+        const mood: CharacterMood =
+          moodNum >= 70 ? "happy"
+          : moodNum >= 40 ? "normal"
+          : moodNum >= 20 ? "sad"
+          : "sick";
+
+        const EXP_TABLE: Record<number, number> = { 1: 800, 2: 1200, 3: 1600, 4: 2400 };
+        const level = Math.min(Math.max(Number(data.level ?? 1), 1), 5) as CharacterLevel;
+
+        // Zustand 스토어 캐릭터 업데이트 → UI에 즉시 반영
+        setCharacter({
+          id: String(data.char_id),
+          name: data.name ?? character?.name ?? "글루",
+          level,
+          mood,
+          experience: data.exp ?? 0,
+          experienceToNextLevel: EXP_TABLE[level] ?? 2400,
+          createdAt: data.created_at
+            ? new Date(data.created_at)
+            : (character?.createdAt ?? new Date()),
+        });
       })
       .catch(() => {
         // 캐릭터 조회 실패 시 기존 상태 유지
