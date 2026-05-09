@@ -80,6 +80,9 @@ interface AppState {
   setDataSyncSettings: (settings: { healthData: boolean; activityTracking: boolean }) => void;
 
   resetApp: () => void;
+
+  // 자정 기준 미션 일일 초기화
+  checkDailyMissionReset: () => void;
 }
 
 // ==========================================
@@ -742,6 +745,33 @@ export const useAppStore = create<AppState>()(
 
       dataSyncSettings: { healthData: true, activityTracking: true },
       setDataSyncSettings: (settings) => set({ dataSyncSettings: settings }),
+
+      // ── 일일 미션 초기화 ──────────────────────────────────────────────────
+      // 앱 진입 시 호출. lastActiveDate가 오늘과 다르면 미션을 새로 생성하고
+      // lastActiveDate를 오늘로 업데이트한다.
+      checkDailyMissionReset: () => {
+        const state = get();
+        if (!state.userProfile) return;
+
+        const today = new Date();
+        const todayStr = today.toDateString(); // e.g. "Fri May 09 2026"
+
+        const lastActive = state.userProfile.lastActiveDate
+          ? new Date(state.userProfile.lastActiveDate)
+          : null;
+        const lastStr = lastActive?.toDateString() ?? "";
+
+        // 날짜가 바뀌었을 때만 초기화
+        if (todayStr !== lastStr) {
+          set({
+            missions: generateMissionsForUser(state.userProfile.healthType),
+            userProfile: {
+              ...state.userProfile,
+              lastActiveDate: today,
+            },
+          });
+        }
+      },
 
       resetApp: () =>
         set({
