@@ -52,7 +52,33 @@ diabetes → diabetes_type: 1type / 2type
 | **Database**          | PostgreSQL 15, SQLAlchemy ORM                           |
 | **Infrastructure**    | Docker, Docker Compose, GitHub Actions, AWS EC2, AWS S3 |
 | **Frontend**          | React, Capacitor (iOS / Android)                        |
-| **Monitoring (예정)** | Sentry, Locust, Redis                                   |
+| **Monitoring**        | Sentry, Locust, Redis                                   |
+
+---
+
+## 아키텍처
+
+```mermaid
+flowchart TD
+    Dev[개발자] -->|git push| GHA[GitHub Actions CI/CD]
+    GHA -->|docker build & push| ECR[AWS ECR]
+    ECR -->|deploy| ECS
+
+    User[사용자] -->|HTTPS| CF[CloudFront]
+    CF -->|정적 자산| S3[S3 Static Hosting]
+    CF -->|API 요청| ALB[ALB]
+    ALB --> ECS
+
+    subgraph ECS[ECS Fargate Task]
+        API[FastAPI 컨테이너]
+        Redis[(Redis 컨테이너\n사이드카)]
+        API <-->|localhost| Redis
+    end
+
+    ECS --> RDS[(RDS PostgreSQL 15)]
+    ECS --> S3B[S3 이미지 저장]
+    ECS --> OpenAI[GPT-4o Vision API]
+```
 
 ---
 
@@ -202,6 +228,44 @@ alembic upgrade head
 http://localhost:8000/health  → 헬스체크
 http://localhost:8000/docs    → Swagger UI
 ```
+
+---
+
+## 성능 개선
+
+| 항목 | 개선 전 | 개선 후 | 개선율 |
+| ---- | ------- | ------- | ------ |
+| `/dashboard` 응답시간 (Redis 캐싱) | 840ms | 190ms | **77% 개선** |
+
+### Locust 부하테스트 결과
+
+- **동시 접속**: 50명
+- **총 처리**: 8,630건
+- **Median**: 59ms / **95%ile**: 140ms
+
+---
+
+## 트러블슈팅
+
+### ECS에서 `ml/risk_model` 경로 찾지 못하는 문제
+
+- **원인**: Dockerfile 빌드 컨텍스트가 `backend/`로 지정되어 상위의 `ml/` 디렉토리에 접근 불가
+- **해결**: 빌드 컨텍스트를 프로젝트 루트(`.`)로 변경하고 Dockerfile 내 `COPY` 경로 수정
+
+### M1 Mac 로컬 빌드 이미지가 ECS에서 실행 안 되는 문제
+
+- **원인**: M1 Mac 기본 빌드 아키텍처(`arm64`)와 ECS Fargate 실행 환경(`amd64`) 불일치
+- **해결**: `docker buildx build --platform linux/amd64` 로 명시적 플랫폼 지정
+
+### Alembic Enum 타입 변경이 감지되지 않는 문제
+
+- **원인**: Alembic `autogenerate`가 PostgreSQL Enum 타입 변경을 추적하지 못함
+- **해결**: `upgrade()` 내에 `ALTER TYPE ... ADD VALUE` SQL 수동 작성
+
+### CloudFront에서 POST 요청 차단되는 문제
+
+- **원인**: CloudFront 기본 동작이 GET/HEAD 외 메서드를 캐시 레이어에서 차단
+- **해결**: API 전용 서브도메인 `api.dangmagoapp.shop` 을 ALB에 직접 연결하여 분리
 
 ---
 
